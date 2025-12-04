@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gasification Energy Balance Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .input-group label { display: block; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
+        .input-group input { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.9rem; transition: border-color 0.2s; }
+        .input-group input:focus { outline: none; border-color: #2563eb; ring: 2px solid #93c5fd; }
+        .result-card { background: white; padding: 1.5rem; border-radius: 0.5rem; border-left: 4px solid #2563eb; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="max-w-6xl mx-auto p-6">
+        
+        <!-- Header -->
+        <div class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-blue-900">Biomass Gasification Energy Balance</h1>
+            <p class="text-gray-600">Based on Modified Equation: Q<sub>loss</sub> = E<sub>in</sub> - (E<sub>chemical</sub> + E<sub>sensible</sub>)</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- INPUT SECTION -->
+            <div class="lg:col-span-4 bg-white p-6 rounded-xl shadow-lg h-fit">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2 text-gray-700">1. Process Inputs</h2>
+                
+                <div class="space-y-4">
+                    <!-- Fuel Data -->
+                    <div class="bg-blue-50 p-4 rounded-lg">
+                        <h3 class="font-bold text-blue-800 text-sm mb-3 uppercase">Fuel Parameters</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="input-group">
+                                <label>Mass Flow (kg/h)</label>
+                                <input type="number" id="massFlow" value="6.4" step="0.1">
+                            </div>
+                            <div class="input-group">
+                                <label>Fuel LHV (MJ/kg)</label>
+                                <input type="number" id="fuelLHV" value="15.8" step="0.1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Syngas Flow & Temp -->
+                    <div class="bg-orange-50 p-4 rounded-lg">
+                        <h3 class="font-bold text-orange-800 text-sm mb-3 uppercase">Syngas Conditions</h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="input-group">
+                                <label>Gas Flow (Nm³/h)</label>
+                                <input type="number" id="gasFlow" value="15.3" step="0.1">
+                            </div>
+                            <div class="input-group">
+                                <label>Outlet Temp (°C)</label>
+                                <input type="number" id="tempOut" value="320" step="1">
+                            </div>
+                            <div class="input-group">
+                                <label>Ref Temp (°C)</label>
+                                <input type="number" id="tempRef" value="25" step="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gas Composition -->
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h3 class="font-bold text-green-800 text-sm mb-3 uppercase">Gas Composition (Vol %)</h3>
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="input-group">
+                                <label>CO %</label>
+                                <input type="number" id="volCO" value="19.2" step="0.1">
+                            </div>
+                            <div class="input-group">
+                                <label>H2 %</label>
+                                <input type="number" id="volH2" value="14.1" step="0.1">
+                            </div>
+                            <div class="input-group">
+                                <label>CH4 %</label>
+                                <input type="number" id="volCH4" value="2.1" step="0.1">
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-2">*Balance is assumed to be N2/CO2</p>
+                    </div>
+
+                    <button onclick="calculateBalance()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md">
+                        Run Calculation
+                    </button>
+                </div>
+            </div>
+
+            <!-- RESULTS SECTION -->
+            <div class="lg:col-span-8 space-y-6">
+                
+                <!-- Main KPI Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="result-card border-l-blue-500">
+                        <p class="text-sm text-gray-500 font-bold uppercase">Syngas LHV</p>
+                        <h3 class="text-3xl font-bold text-gray-800 mt-1"><span id="resLHV">0.00</span> <span class="text-lg text-gray-400 font-normal">MJ/Nm³</span></h3>
+                        <p class="text-xs text-gray-400 mt-2">Energy Density</p>
+                    </div>
+                    <div class="result-card border-l-green-500">
+                        <p class="text-sm text-gray-500 font-bold uppercase">Cold Gas Efficiency</p>
+                        <h3 class="text-3xl font-bold text-green-600 mt-1"><span id="resEff">0.00</span>%</h3>
+                        <p class="text-xs text-gray-400 mt-2">Fuel to Gas Conversion</p>
+                    </div>
+                    <div class="result-card border-l-red-500">
+                        <p class="text-sm text-gray-500 font-bold uppercase">System Losses</p>
+                        <h3 class="text-3xl font-bold text-red-600 mt-1"><span id="resLoss">0.00</span> <span class="text-lg text-gray-400 font-normal">MJ/h</span></h3>
+                        <p class="text-xs text-gray-400 mt-2">Wall Loss + Unburnt Char</p>
+                    </div>
+                </div>
+
+                <!-- Detailed Balance Table -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="font-bold text-gray-700">Detailed Energy Breakdown (Modified Equation)</h3>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                        
+                        <!-- The Math -->
+                        <div class="space-y-4 text-sm">
+                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <span class="text-gray-600">Total Input (H<sub>feed</sub>)</span>
+                                <span class="font-mono font-bold text-blue-600" id="valIn">0.00 MJ/h</span>
+                            </div>
+                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <span class="text-gray-600">Chemical Out (H<sub>chem</sub>)</span>
+                                <span class="font-mono font-bold text-green-600" id="valChem">0.00 MJ/h</span>
+                            </div>
+                            <div class="flex justify-between items-center pb-2 border-b border-gray-100">
+                                <span class="text-gray-600">Sensible Out (H<sub>sens</sub>)</span>
+                                <span class="font-mono font-bold text-orange-600" id="valSens">0.00 MJ/h</span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2">
+                                <span class="font-bold text-gray-800">Total Losses (Q<sub>loss</sub>)</span>
+                                <span class="font-mono font-bold text-red-600" id="valLoss">0.00 MJ/h</span>
+                            </div>
+                        </div>
+
+                        <!-- The Chart -->
+                        <div class="h-64">
+                            <canvas id="energyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analysis Box -->
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-6">
+                    <h3 class="text-blue-900 font-bold mb-2">💡 Analysis of Current Results</h3>
+                    <p class="text-blue-800 text-sm leading-relaxed" id="analysisText">
+                        Run the calculation to see the analysis.
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let myChart = null;
+
+        // Standard Heating Values (MJ/Nm3)
+        const LHV_CO = 12.63;
+        const LHV_H2 = 10.78;
+        const LHV_CH4 = 35.88;
+        const CP_GAS = 1.35; // Approx specific heat kJ/Nm3K
+
+        function calculateBalance() {
+            // 1. Get Inputs
+            const m_fuel = parseFloat(document.getElementById('massFlow').value);
+            const lhv_fuel = parseFloat(document.getElementById('fuelLHV').value);
+            
+            const v_gas = parseFloat(document.getElementById('gasFlow').value);
+            const t_out = parseFloat(document.getElementById('tempOut').value);
+            const t_ref = parseFloat(document.getElementById('tempRef').value);
+
+            const pct_co = parseFloat(document.getElementById('volCO').value) / 100;
+            const pct_h2 = parseFloat(document.getElementById('volH2').value) / 100;
+            const pct_ch4 = parseFloat(document.getElementById('volCH4').value) / 100;
+
+            // 2. Calculations
+            
+            // Energy Input (H_feed)
+            const E_in = m_fuel * lhv_fuel;
+
+            // Output LHV (Gas Quality)
+            const LHV_gas = (pct_co * LHV_CO) + (pct_h2 * LHV_H2) + (pct_ch4 * LHV_CH4);
+
+            // Chemical Energy Output (H_chem)
+            const E_chem = v_gas * LHV_gas;
+
+            // Sensible Energy Output (H_sens) -> Convert kJ to MJ
+            const delta_T = t_out - t_ref;
+            const E_sens_kJ = v_gas * CP_GAS * delta_T;
+            const E_sens = E_sens_kJ / 1000;
+
+            // Losses (Q_loss) - Modified Equation
+            const E_loss = E_in - (E_chem + E_sens);
+
+            // Efficiency (CGE)
+            const CGE = (E_chem / E_in) * 100;
+
+            // 3. Update Display
+            document.getElementById('resLHV').innerText = LHV_gas.toFixed(2);
+            document.getElementById('resEff').innerText = CGE.toFixed(1);
+            document.getElementById('resLoss').innerText = E_loss.toFixed(2);
+
+            document.getElementById('valIn').innerText = E_in.toFixed(2) + " MJ/h";
+            document.getElementById('valChem').innerText = E_chem.toFixed(2) + " MJ/h";
+            document.getElementById('valSens').innerText = E_sens.toFixed(2) + " MJ/h";
+            document.getElementById('valLoss').innerText = E_loss.toFixed(2) + " MJ/h";
+
+            // 4. Update Analysis Text
+            let analysis = "";
+            if(LHV_gas > 4.5) {
+                analysis += `✅ <strong>Good Gas Quality (${LHV_gas.toFixed(2)} MJ/Nm³):</strong> Suitable for ICE power generation. `;
+            } else {
+                analysis += `⚠️ <strong>Low Gas Quality (${LHV_gas.toFixed(2)} MJ/Nm³):</strong> Better suited for thermal (heating) applications. `;
+            }
+
+            if(CGE > 70) {
+                analysis += `Efficiency is <strong>good (${CGE.toFixed(1)}%)</strong>. `;
+            } else {
+                analysis += `Efficiency is <strong>low (${CGE.toFixed(1)}%)</strong>. Check for heat leaks or incomplete carbon conversion. `;
+            }
+            document.getElementById('analysisText').innerHTML = analysis;
+
+            // 5. Render Chart
+            renderChart(E_chem, E_sens, E_loss);
+        }
+
+        function renderChart(chem, sens, loss) {
+            const ctx = document.getElementById('energyChart').getContext('2d');
+            
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Chemical Energy (Useful)', 'Sensible Heat (Hot Gas)', 'Losses (Wall/Char)'],
+                    datasets: [{
+                        data: [chem, sens, loss],
+                        backgroundColor: [
+                            '#16a34a', // Green-600
+                            '#ea580c', // Orange-600
+                            '#dc2626'  // Red-600
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+        // Run once on load
+        window.onload = calculateBalance;
+    </script>
+</body>
+</html>
